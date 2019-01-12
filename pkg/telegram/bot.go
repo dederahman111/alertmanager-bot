@@ -232,7 +232,13 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 	}
 
 	messages := make(chan telebot.Message, 100)
-	b.telegram.Listen(messages, time.Second)
+	// b.telegram.Listen(messages, time.Second)
+	queries := make(chan telebot.Query, 500)
+	callbacks := make(chan telebot.Callback, 500)
+	b.telegram.Messages = messages
+	b.telegram.Queries = queries
+	b.telegram.Callbacks = callbacks
+	go b.telegram.Start(1 * time.Second)
 
 	var gr run.Group
 	{
@@ -256,6 +262,13 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 							"sender_username", message.Sender.Username,
 						)
 					}
+				case callback := <-callbacks:
+					level.Debug(b.logger).Log(
+						"msg", "received callback",
+						"data", callback.Data,
+						"sender_id", callback.Sender.ID,
+						"sender_username", callback.Sender.Username,
+					)
 				}
 			}
 		}, func(err error) {
