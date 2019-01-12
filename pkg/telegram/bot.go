@@ -295,7 +295,23 @@ func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMes
 			}
 
 			for _, chat := range chats {
-				b.telegram.SendMessage(chat, out, &telebot.SendOptions{ParseMode: telebot.ModeHTML})
+				b.telegram.SendMessage(chat, out, &telebot.SendOptions{
+					ParseMode: telebot.ModeHTML,
+					ReplyMarkup: telebot.ReplyMarkup{
+						InlineKeyboard: [][]telebot.KeyboardButton{
+							[]telebot.KeyboardButton{
+								telebot.KeyboardButton{
+									Text: "Acknowledge",
+									Data: "/ack", // Callback query
+								},
+								telebot.KeyboardButton{
+									Text: "Forward",
+									Data: "/frwd", // Callback query
+								},
+							},
+						},
+					},
+				})
 			}
 		}
 	}

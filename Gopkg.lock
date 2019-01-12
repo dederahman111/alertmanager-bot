@@ -343,14 +343,16 @@
   version = "v0.15.3"
 
 [[projects]]
-  digest = "1:9e6e005a467ff9b1e4bb32e4c64ef36f6ab9c3313335acc66b83eaf9570d1d95"
+  digest = "1:93a746f1060a8acbcf69344862b2ceced80f854170e1caae089b2834c5fbf7f4"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
+    "prometheus/internal",
     "prometheus/promhttp",
   ]
   pruneopts = "UT"
-  revision = "c3324c1198cf3374996e9d3098edd46a6b55afc9"
+  revision = "505eaef017263e299324067d40ca2c48f6a2cf50"
+  version = "v0.9.2"
 
 [[projects]]
   branch = "master"
@@ -358,10 +360,11 @@
   name = "github.com/prometheus/client_model"
   packages = ["go"]
   pruneopts = "UT"
-  revision = "5c3871d89910bfb32f5fcab2aa4b9ec68e65a99f"
+  revision = "f287a105a20ec685d797f65cd0ce8fbeaef42da1"
 
 [[projects]]
-  digest = "1:f5230e376231e489365dd86ceea2e5205a42f5ed4ceaab13c4e7f9eb75ceb666"
+  branch = "master"
+  digest = "1:7b7d0a4d2eb73417daf29284e6152edada0f463e2984090284cee388108c9b49"
   name = "github.com/prometheus/common"
   packages = [
     "config",
@@ -371,7 +374,7 @@
     "version",
   ]
   pruneopts = "UT"
-  revision = "7600349dcfe1abd18d72d3a1770870d9800a7801"
+  revision = "2998b132700a7d019ff618c06a234b47c1f3f681"
 
 [[projects]]
   branch = "master"
@@ -431,7 +434,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:cc69b66377d151326324dd9225f034c9d4ba002d8424dbc2d1d82c950dbaa89b"
+  digest = "1:6ab3822b4c704810ebc4d3656c42a60f8d4fb81dc8b31f78f295fd974a70f8b9"
   name = "golang.org/x/net"
   packages = [
     "bpf",
@@ -445,15 +448,15 @@
     "trace",
   ]
   pruneopts = "UT"
-  revision = "1e06a53dbb7e2ed46e91183f219db23c6943c532"
+  revision = "915654e7eabcea33ae277abbecf52f0d8b7a9fdc"
 
 [[projects]]
   branch = "master"
-  digest = "1:f106a08663d0031b576f61ab81ffd80124da17096eab36aceb25b1b0d847da9a"
+  digest = "1:91137b48dc3eb34409f731b49f63a5ebf73218168a065e1a93af24eb5b2f99e8"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "7fbe1cd0fcc20051e1fcb87fbabec4a1bacaaeba"
+  revision = "48ac38b7c8cbedd50b1613c0fccacfc7d88dfcdf"
 
 [[projects]]
   digest = "1:c06d9e11d955af78ac3bbb26bd02e01d2f61f689e1a3bce2ef6fb683ef8a7f2d"
