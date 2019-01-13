@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/alertmanager/template"
 	"github.com/prometheus/alertmanager/types"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/model"
 	"github.com/tucnak/telebot"
 	"github.com/vu-long/alertmanager-bot/pkg/alertmanager"
 )
@@ -232,14 +233,14 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 	}
 
 	messages := make(chan telebot.Message, 100)
-	// b.telegram.Listen(messages, time.Second)
 	queries := make(chan telebot.Query, 500)
 	callbacks := make(chan telebot.Callback, 500)
 	b.telegram.Messages = messages
 	b.telegram.Queries = queries
 	b.telegram.Callbacks = callbacks
+	// b.telegram.Listen(messages, time.Second)
 	go b.telegram.Start(1 * time.Second)
-
+	
 	var gr run.Group
 	{
 		gr.Add(func() error {
@@ -268,6 +269,7 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 						"data", callback.Data,
 						"sender_id", callback.Sender.ID,
 						"sender_username", callback.Sender.Username,
+						"message_id", callback.MessageID,
 					)
 				}
 			}
@@ -308,23 +310,29 @@ func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMes
 			}
 
 			for _, chat := range chats {
-				b.telegram.SendMessage(chat, out, &telebot.SendOptions{
-					ParseMode: telebot.ModeHTML,
-					ReplyMarkup: telebot.ReplyMarkup{
-						InlineKeyboard: [][]telebot.KeyboardButton{
-							[]telebot.KeyboardButton{
-								telebot.KeyboardButton{
-									Text: "Acknowledge",
-									Data: "/ack", // Callback query
-								},
-								telebot.KeyboardButton{
-									Text: "Forward",
-									Data: "/frwd", // Callback query
+				if w.Status == string(model.AlertFiring) {
+					b.telegram.SendMessage(chat, out, &telebot.SendOptions{
+						ParseMode: telebot.ModeHTML,
+						ReplyMarkup: telebot.ReplyMarkup{
+							InlineKeyboard: [][]telebot.KeyboardButton{
+								[]telebot.KeyboardButton{
+									telebot.KeyboardButton{
+										Text: "Acknowledge",
+										Data: "Acknowledge", // Callback query
+									},
+									telebot.KeyboardButton{
+										Text: "Forward",
+										Data: "Forward", // Callback query
+									},
 								},
 							},
 						},
-					},
-				})
+					})
+					respString := fmt.Sprintf("@%s", "vu_long")
+					b.telegram.SendMessage(chat, respString, nil)
+				} else if w.Status == string(model.AlertResolved) {
+					// TODO:
+				}
 			}
 		}
 	}
