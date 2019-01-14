@@ -1,39 +1,26 @@
 package telegram
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/prometheus/alertmanager/template"
 	"github.com/tucnak/telebot"
 )
 
-// Server saves the exported node
-type Server struct {
-	id    string
-	name  string
-	owner string
-}
-
-// Member saves the member's telegram info and level in the group
-type Member struct {
-	username string
-	level    string
-}
-
-// Members saves all members of chat with level
-type Members struct {
-	chat    telebot.Chat
-	members []Member
-}
-
 // HandleAlert shows all of Alert in the
 type HandleAlert struct {
-	messageID   string
-	chat        telebot.Chat
-	alert       template.Alert
-	level       HandleLevel
-	lastUpdate  time.Time
-	autoForward bool
+	MessageID       string
+	Chat            telebot.Chat
+	Alert           template.Alert
+	Level           HandleLevel
+	LastUpdate      time.Time
+	AutoForwardFlag bool
+}
+
+// Destination is internal inline message ID.
+func (a HandleAlert) Destination() string {
+	return a.MessageID
 }
 
 // HandleLevel shows the level of member is handling the firing alert
@@ -43,6 +30,13 @@ const (
 	levelOne   HandleLevel = "level1"
 	levelTwo   HandleLevel = "level2"
 	levelThree HandleLevel = "level3"
+
+	// AutoForwardTimeout If no one action that message in 5 minutes, then do auto forward
+	AutoForwardTimeout time.Duration = 5 * time.Minute
+
+	strAcknowledge string = "Acknowledge by: %s"
+	strForward     string = "%s forward to %s"
+	strAutoForward string = "Auto forward to next level %s"
 )
 
 // BotAlertStore is all the Bot needs to store and read
@@ -65,31 +59,86 @@ type BotAlertStore interface {
 // NewAlert creates the Handle Alert object
 func NewAlert(messageID string, chat telebot.Chat, alert template.Alert, bot Bot) (*HandleAlert, error) {
 	a := &HandleAlert{
-		messageID:   messageID,
-		chat:        chat,
-		alert:       alert,
-		level:       levelOne,
-		lastUpdate:  time.Now(),
-		autoForward: true,
+		MessageID:       messageID,
+		Chat:            chat,
+		Alert:           alert,
+		Level:           levelOne,
+		LastUpdate:      time.Now(),
+		AutoForwardFlag: true,
 	}
-
+	go a.AutoForward(bot, 5*time.Second)
 	return a, nil
 }
 
-func (a *HandleAlert) Forward() error {
+// Acknowledge is function to process callback whenever member press the Acknowledge button
+func (a *HandleAlert) Acknowledge(bot telebot.Bot, callback telebot.Callback) error {
+	err := bot.EditMessageReplyMakeup(a, &telebot.SendOptions{
+		ParseMode: telebot.ModeHTML,
+	})
+	if err != nil {
+		return err
+	}
+
+	a.AutoForwardFlag = false
+
+	respString := fmt.Sprintf(strAcknowledge, callback.Sender.Username)
+	bot.SendMessage(a.Chat, respString, nil)
+	return nil
+}
+
+// Forward is function to process callback whenever member press the Forward button
+func (a *HandleAlert) Forward(bot telebot.Bot, callback telebot.Callback) error {
+	err := bot.EditMessageReplyMakeup(a, &telebot.SendOptions{
+		ParseMode: telebot.ModeHTML,
+		ReplyMarkup: telebot.ReplyMarkup{
+			InlineKeyboard: [][]telebot.KeyboardButton{
+				[]telebot.KeyboardButton{
+					telebot.KeyboardButton{
+						Text: "Acknowledge",
+						Data: "Acknowledge", // Callback query
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	a.IncreaseLevel()
+
+	respString := fmt.Sprintf(strForward, callback.Sender.Username, GetRandomMemberByLevel())
+	bot.SendMessage(a.Chat, respString, nil)
+	return nil
+}
+
+// IncreaseLevel increase the level on alert
+func (a *HandleAlert) IncreaseLevel() bool {
+	if a.Level == levelOne {
+		a.Level = levelTwo
+	} else if a.Level == levelTwo {
+		a.Level = levelThree
+	} else {
+		return false
+	}
+	return true
+}
+
+// AutoForward job run to auto forward and push the alert to telegram alert group
+func (a *HandleAlert) AutoForward(bot Bot, timeout time.Duration) error {
+	for a.AutoForwardFlag == true {
+		if time.Since(a.LastUpdate) >= AutoForwardTimeout {
+
+			respString := fmt.Sprintf(strForward, callback.Sender.Username)
+			bot.SendMessage(a.Chat, respString, nil)
+		}
+		// Wait for a bit and try again.
+		time.Sleep(timeout)
+	}
 
 	return nil
 }
 
-func (a *HandleAlert) Acknowledge() error {
+func (a *HandleAlert) callbackHandler(callback telebot.Callback) error {
 	return nil
-}
-
-func (a *HandleAlert) AutoForward() error {
-
-	return nil
-}
-
-func (a *HandleAlert) callbackHandler(callback *telebot.Callback) error {
-
 }
