@@ -72,6 +72,7 @@ func (s *MemberStore) Remove(m Members) error {
 	return s.kv.Delete(key)
 }
 
+// GetMembersByChat helps getting members by chat ID
 func (s *MemberStore) GetMembersByChat(chat telebot.Chat) (Members, error) {
 	var ret Members
 	members, err := s.List()
@@ -87,7 +88,7 @@ func (s *MemberStore) GetMembersByChat(chat telebot.Chat) (Members, error) {
 	return ret, err
 }
 
-// GetRandomMemberByLevel
+// GetRandomMemberByLevel get random member by level
 func (m *Members) GetRandomMemberByLevel(level string) (string, error) {
 	var group []Member
 	for _, mr := range m.Members {

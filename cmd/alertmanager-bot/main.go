@@ -199,8 +199,22 @@ func main() {
 			os.Exit(1)
 		}
 
+		// Key/Value store for saving members of chats
+		members, err := telegram.NewMemberStore(kvStore)
+		if err != nil {
+			level.Error(logger).Log("msg", "failed to create chat store", "err", err)
+			os.Exit(1)
+		}
+
+		// Key/Value store for saving node exported info
+		nodes, err := telegram.NewNodeStore(kvStore)
+		if err != nil {
+			level.Error(logger).Log("msg", "failed to create chat store", "err", err)
+			os.Exit(1)
+		}
+
 		bot, err := telegram.NewBot(
-			chats, config.telegramToken, config.telegramAdmins[0],
+			chats, members, nodes, config.telegramToken, config.telegramAdmins[0],
 			telegram.WithLogger(tlogger),
 			telegram.WithAddr(config.listenAddr),
 			telegram.WithAlertmanager(config.alertmanager),

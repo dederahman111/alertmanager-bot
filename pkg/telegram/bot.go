@@ -22,6 +22,9 @@ import (
 )
 
 const (
+	strAcknowledgeData = "Acknowledge"
+	strForwardData     = "Forward"
+
 	commandStart = "/start"
 	commandStop  = "/stop"
 	commandHelp  = "/help"
@@ -64,6 +67,8 @@ type Bot struct {
 	alertmanager *url.URL
 	templates    *template.Template
 	chats        BotChatStore
+	members      MemberStore
+	nodes        NodeStore
 	logger       log.Logger
 	revision     string
 	startTime    time.Time
@@ -78,7 +83,7 @@ type Bot struct {
 type BotOption func(b *Bot)
 
 // NewBot creates a Bot with the UserStore and telegram telegram
-func NewBot(chats BotChatStore, token string, admin int, opts ...BotOption) (*Bot, error) {
+func NewBot(chats BotChatStore, members MemberStore, nodes NodeStore, token string, admin int, opts ...BotOption) (*Bot, error) {
 	bot, err := telebot.NewBot(token)
 	if err != nil {
 		return nil, err
@@ -97,6 +102,8 @@ func NewBot(chats BotChatStore, token string, admin int, opts ...BotOption) (*Bo
 		logger:          log.NewNopLogger(),
 		telegram:        bot,
 		chats:           chats,
+		members:         members,
+		nodes:           nodes,
 		addr:            "127.0.0.1:8080",
 		admins:          []int{admin},
 		alertmanager:    &url.URL{Host: "localhost:9093"},
@@ -240,16 +247,19 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 	b.telegram.Callbacks = callbacks
 	// b.telegram.Listen(messages, time.Second)
 	go b.telegram.Start(1 * time.Second)
-	
+	alertchan := make(chan *HandleAlert, 100)
+
 	var gr run.Group
 	{
 		gr.Add(func() error {
-			return b.sendWebhook(ctx, webhooks)
+			return b.sendWebhook(ctx, webhooks, alertchan)
 		}, func(err error) {
 		})
 	}
 	{
 		gr.Add(func() error {
+			// var HandleAlerts []HandleAlert
+			HandleAlerts := make(map[string][]*HandleAlert)
 			for {
 				select {
 				case <-ctx.Done():
@@ -271,7 +281,22 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 						"sender_username", callback.Sender.Username,
 						"message_id", callback.MessageID,
 					)
+
+					// TODO: Handle if member press the "Acknowledge" button
+					if callback.Data == strAcknowledgeData {
+
+					} else if callback.Data == strForwardData {
+						// TODO: Handle if member press the "Acknowledge" button
+
+					}
+				case a := <-alertchan:
+					// Get the HandleAlert in channel and save
+					// HandleAlerts = append(HandleAlerts, a)
+					if HandleAlerts[a.ID] == nil {
+						HandleAlerts[a.ID] = append(HandleAlerts[a.ID], a)
+					}
 				}
+
 			}
 		}, func(err error) {
 		})
@@ -281,7 +306,8 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 }
 
 // sendWebhook sends messages received via webhook to all subscribed chats
-func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMessage) error {
+func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMessage, alerts chan<- *HandleAlert) error {
+	HandleAlerts := make(map[string][]*HandleAlert)
 	for {
 		select {
 		case <-ctx.Done():
@@ -310,31 +336,47 @@ func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMes
 			}
 
 			for _, chat := range chats {
-				if w.Status == string(model.AlertFiring) {
+				// If receive the resolved signal via webhook, Resolve() all of HandlerAlert in the map list
+				if w.Status == string(model.AlertResolved) {
+					if HandleAlerts[data.GroupLabels.Values()[0]] != nil {
+						for _, h := range HandleAlerts[data.GroupLabels.Values()[0]] {
+							h.Resolved(*b.telegram)
+						}
+					}
+				} else if w.Status == string(model.AlertFiring) {
+					// If receive the firing signal via webhook, create the inline message with 2 buttons,
+
 					b.telegram.SendMessage(chat, out, &telebot.SendOptions{
 						ParseMode: telebot.ModeHTML,
 						ReplyMarkup: telebot.ReplyMarkup{
 							InlineKeyboard: [][]telebot.KeyboardButton{
 								[]telebot.KeyboardButton{
 									telebot.KeyboardButton{
-										Text: "Acknowledge",
-										Data: "Acknowledge", // Callback query
+										Text: strAcknowledgeData,
+										Data: strAcknowledgeData, // Callback query
 									},
 									telebot.KeyboardButton{
-										Text: "Forward",
-										Data: "Forward", // Callback query
+										Text: strForwardData,
+										Data: strForwardData, // Callback query
 									},
 								},
 							},
 						},
 					})
-					respString := fmt.Sprintf("@%s", "vu_long")
-					b.telegram.SendMessage(chat, respString, nil)
-				} else if w.Status == string(model.AlertResolved) {
-					// TODO:
+
+					// And create new HandleAlert object and put it to channel
+					alert, err := NewAlert(data.GroupLabels.Values()[0], chat, data.Alerts[0], *b)
+					if err != nil {
+						level.Error(b.logger).Log("msg", "failed to create new handle alert", "err", err)
+					}
+					alerts <- alert
+
+					// Save it to process whenever receive resolved signal
+					HandleAlerts[alert.ID] = append(HandleAlerts[alert.ID], alert)
 				}
 			}
 		}
+
 	}
 }
 
