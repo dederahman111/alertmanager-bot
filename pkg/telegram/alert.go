@@ -11,8 +11,8 @@ import (
 // HandleAlert shows all of Alert in the
 type HandleAlert struct {
 	ID              string
-	MemberStore     MemberStore
-	NodeStore       NodeStore
+	MemberStore     BotMemberStore
+	NodeStore       BotNodeStore
 	Chat            telebot.Chat
 	Alert           template.Alert
 	Level           HandleLevel

@@ -60,6 +60,21 @@ type BotChatStore interface {
 	Remove(telebot.Chat) error
 }
 
+// BotMemberStore is all the Bot needs to store and read
+type BotMemberStore interface {
+	List() ([]Members, error)
+	Add(Members) error
+	Remove(Members) error
+	GetMembersByChat(telebot.Chat) (Members, error)
+}
+
+// BotNodeStore is all the Bot needs to store and read
+type BotNodeStore interface {
+	List() ([]NodeExported, error)
+	Add(NodeExported) error
+	Remove(NodeExported) error
+}
+
 // Bot runs the alertmanager telegram
 type Bot struct {
 	addr         string
@@ -67,8 +82,8 @@ type Bot struct {
 	alertmanager *url.URL
 	templates    *template.Template
 	chats        BotChatStore
-	members      MemberStore
-	nodes        NodeStore
+	members      BotMemberStore
+	nodes        BotNodeStore
 	logger       log.Logger
 	revision     string
 	startTime    time.Time
@@ -83,7 +98,7 @@ type Bot struct {
 type BotOption func(b *Bot)
 
 // NewBot creates a Bot with the UserStore and telegram telegram
-func NewBot(chats BotChatStore, members MemberStore, nodes NodeStore, token string, admin int, opts ...BotOption) (*Bot, error) {
+func NewBot(chats BotChatStore, members BotMemberStore, nodes BotNodeStore, token string, admin int, opts ...BotOption) (*Bot, error) {
 	bot, err := telebot.NewBot(token)
 	if err != nil {
 		return nil, err
@@ -294,6 +309,10 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 					// HandleAlerts = append(HandleAlerts, a)
 					if HandleAlerts[a.ID] == nil {
 						HandleAlerts[a.ID] = append(HandleAlerts[a.ID], a)
+						level.Debug(b.logger).Log(
+							"msg", "received callback",
+							"data", a.ID,
+						)
 					}
 				}
 
