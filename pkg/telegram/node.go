@@ -9,7 +9,6 @@ import (
 
 // NodeExported saves the exported node
 type NodeExported struct {
-	ID    string `json:"node_id"`
 	Name  string `json:"name"`
 	Owner string `json:"owner_id"`
 }
@@ -52,13 +51,13 @@ func (s *NodeStore) Add(n NodeExported) error {
 		return err
 	}
 
-	key := fmt.Sprintf("%s/%s", telegramNodesDirectory, n.ID)
+	key := fmt.Sprintf("%s/%s", telegramNodesDirectory, n.Name)
 
 	return s.kv.Put(key, b, nil)
 }
 
 // Remove a telegram nodes from the kv backend
 func (s *NodeStore) Remove(n NodeExported) error {
-	key := fmt.Sprintf("%s/%s", telegramNodesDirectory, n.ID)
+	key := fmt.Sprintf("%s/%s", telegramNodesDirectory, n.Name)
 	return s.kv.Delete(key)
 }
