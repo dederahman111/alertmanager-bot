@@ -80,13 +80,13 @@ func NewAlert(messageID string, chat telebot.Chat, alert template.Alert, bot Bot
 	respString := fmt.Sprintf("@%s", randMember.Username)
 	bot.telegram.SendMessage(a.Chat, respString, nil)
 
-	go a.AutoForward(*bot.telegram, 5*time.Second)
+	go a.AutoForward(bot.telegram, 5*time.Second)
 
 	return a, nil
 }
 
 // Acknowledge is function to process callback whenever member press the Acknowledge button
-func (a *HandleAlert) Acknowledge(bot telebot.Bot, callback telebot.Callback) error {
+func (a *HandleAlert) Acknowledge(bot *telebot.Bot, callback telebot.Callback) error {
 	err := bot.EditMessageReplyMakeup(a, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 	})
@@ -102,7 +102,7 @@ func (a *HandleAlert) Acknowledge(bot telebot.Bot, callback telebot.Callback) er
 }
 
 // Forward is function to process callback whenever member press the Forward button
-func (a *HandleAlert) Forward(bot telebot.Bot, callback telebot.Callback) error {
+func (a *HandleAlert) Forward(bot *telebot.Bot, callback telebot.Callback) error {
 	err := bot.EditMessageReplyMakeup(a, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 		ReplyMarkup: telebot.ReplyMarkup{
@@ -132,7 +132,7 @@ func (a *HandleAlert) Forward(bot telebot.Bot, callback telebot.Callback) error 
 }
 
 // AutoForward job run to auto forward and push the alert to telegram alert group
-func (a *HandleAlert) AutoForward(bot telebot.Bot, timeout time.Duration) error {
+func (a *HandleAlert) AutoForward(bot *telebot.Bot, timeout time.Duration) error {
 	for a.AutoForwardFlag == true {
 		if time.Since(a.LastUpdate) >= AutoForwardTimeout {
 			a.IncreaseLevel()
@@ -152,7 +152,7 @@ func (a *HandleAlert) AutoForward(bot telebot.Bot, timeout time.Duration) error 
 }
 
 // Resolved handle resolve signal from callback
-func (a *HandleAlert) Resolved(bot telebot.Bot) error {
+func (a *HandleAlert) Resolved(bot *telebot.Bot) error {
 	err := bot.EditMessageReplyMakeup(a, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 	})

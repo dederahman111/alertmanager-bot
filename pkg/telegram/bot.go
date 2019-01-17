@@ -33,6 +33,7 @@ const (
 	commandChats   = "/chats"
 	commandMember  = "/member"
 	commandMembers = "/members"
+	commandNodes   = "/nodes"
 
 	commandStatus     = "/status"
 	commandAlerts     = "/alerts"
@@ -215,6 +216,7 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 		commandSilences: b.handleSilences,
 		commandMember:   b.handleMember,
 		commandMembers:  b.handleMembers,
+		commandNodes:    b.handleNodes,
 	}
 
 	// init counters with 0
@@ -314,11 +316,16 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 						level.Error(b.logger).Log("err", err)
 					}
 
-					// TODO: Handle if member press the "Acknowledge" button
+					// Handle if member press the "Acknowledge" button
 					if cd.Button == strAcknowledgeData {
-
+						for _, h := range HandleAlerts[cd.AlertID] {
+							h.Acknowledge(b.telegram, callback)
+						}
 					} else if cd.Button == strForwardData {
-						// TODO: Handle if member press the "Acknowledge" button
+						// Handle if member press the "Acknowledge" button
+						for _, h := range HandleAlerts[cd.AlertID] {
+							h.Forward(b.telegram, callback)
+						}
 
 					}
 				case a := <-alertchan:
@@ -327,7 +334,7 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 					if HandleAlerts[a.ID] == nil {
 						HandleAlerts[a.ID] = append(HandleAlerts[a.ID], a)
 						level.Debug(b.logger).Log(
-							"msg", "received callback",
+							"msg", "received alert",
 							"data", a.ID,
 						)
 					}
@@ -376,7 +383,7 @@ func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMes
 				if w.Status == string(model.AlertResolved) {
 					if HandleAlerts[data.GroupLabels.Values()[0]] != nil {
 						for _, h := range HandleAlerts[data.GroupLabels.Values()[0]] {
-							h.Resolved(*b.telegram)
+							h.Resolved(b.telegram)
 						}
 					}
 				} else if w.Status == string(model.AlertFiring) {
@@ -386,11 +393,13 @@ func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMes
 						break
 					}
 					jsonAckStr, err := json.Marshal(ackData)
+					level.Debug(b.logger).Log("json", jsonAckStr)
 					fwdData, err := NewCallbackData(data.GroupLabels.Values()[0], strForwardData)
 					if err != nil {
 						break
 					}
 					jsonFwdStr, err := json.Marshal(fwdData)
+					level.Debug(b.logger).Log("json", jsonFwdStr)
 
 					b.telegram.SendMessage(chat, out, &telebot.SendOptions{
 						ParseMode: telebot.ModeHTML,
@@ -623,5 +632,25 @@ func (b *Bot) handleMembers(message telebot.Message) {
 		list = list + fmt.Sprintf("@%s level: %s\n", member.Username, member.Level)
 	}
 
+	level.Debug(b.logger).Log("list", list)
+
 	b.telegram.SendMessage(message.Chat, "Currently these members have added:\n"+list, nil)
+}
+
+func (b *Bot) handleNodes(message telebot.Message) {
+	nodes, err := b.nodes.List()
+	if err != nil {
+		level.Warn(b.logger).Log("msg", "failed to list members from nodes store", "err", err)
+		b.telegram.SendMessage(message.Chat, "I can't list the added nodes.", nil)
+		return
+	}
+
+	list := ""
+	for _, node := range nodes {
+		list = list + fmt.Sprintf("@%s level: %s\n", node.Name, node.Owner)
+	}
+
+	level.Debug(b.logger).Log("list", list)
+
+	b.telegram.SendMessage(message.Chat, "Currently these nodes have added:\n"+list, nil)
 }

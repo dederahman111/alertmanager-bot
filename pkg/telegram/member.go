@@ -55,14 +55,14 @@ func (s *MemberStore) Add(m Member) error {
 		return err
 	}
 
-	key := fmt.Sprintf("%s/%d", telegramMembersDirectory, m.Chat.ID)
+	key := fmt.Sprintf("%s/%s", telegramMembersDirectory, m.Username)
 
 	return s.kv.Put(key, b, nil)
 }
 
 // Remove a telegram members from the kv backend
 func (s *MemberStore) Remove(m Member) error {
-	key := fmt.Sprintf("%s/%d", telegramMembersDirectory, m.Chat.ID)
+	key := fmt.Sprintf("%s/%s", telegramMembersDirectory, m.Username)
 	return s.kv.Delete(key)
 }
 
@@ -96,6 +96,6 @@ func (s *MemberStore) GetRandomMemberByChatandLevel(chat telebot.Chat, level str
 		}
 	}
 	rand.Seed(time.Now().UnixNano())
-	choosen := groupByLevel[rand.Intn(len(groupByLevel)-1)]
+	choosen := groupByLevel[rand.Intn(len(groupByLevel))]
 	return choosen, nil
 }
