@@ -27,13 +27,14 @@ const (
 	strAcknowledgeData = "Acknowledge"
 	strForwardData     = "Forward"
 
-	commandStart   = "/start"
-	commandStop    = "/stop"
-	commandHelp    = "/help"
-	commandChats   = "/chats"
-	commandMember  = "/member"
-	commandMembers = "/members"
-	commandNodes   = "/nodes"
+	commandStart        = "/start"
+	commandStop         = "/stop"
+	commandHelp         = "/help"
+	commandChats        = "/chats"
+	commandAddMember    = "/addmember"
+	commandRemoveMember = "/rmmember"
+	commandMembers      = "/members"
+	commandNodes        = "/nodes"
 
 	commandStatus     = "/status"
 	commandAlerts     = "/alerts"
@@ -207,16 +208,17 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 	commandSuffix := fmt.Sprintf("@%s", b.telegram.Identity.Username)
 
 	commands := map[string]func(message telebot.Message){
-		commandStart:    b.handleStart,
-		commandStop:     b.handleStop,
-		commandHelp:     b.handleHelp,
-		commandChats:    b.handleChats,
-		commandStatus:   b.handleStatus,
-		commandAlerts:   b.handleAlerts,
-		commandSilences: b.handleSilences,
-		commandMember:   b.handleMember,
-		commandMembers:  b.handleMembers,
-		commandNodes:    b.handleNodes,
+		commandStart:        b.handleStart,
+		commandStop:         b.handleStop,
+		commandHelp:         b.handleHelp,
+		commandChats:        b.handleChats,
+		commandStatus:       b.handleStatus,
+		commandAlerts:       b.handleAlerts,
+		commandSilences:     b.handleSilences,
+		commandAddMember:    b.handleAddMember,
+		commandRemoveMember: b.handleRemoveMember,
+		commandMembers:      b.handleMembers,
+		commandNodes:        b.handleNodes,
 	}
 
 	// init counters with 0
@@ -311,7 +313,7 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 					dec := json.NewDecoder(strings.NewReader(callback.Data))
 					dec.Decode(&cd)
 					if err := dec.Decode(&cd); err == io.EOF {
-						break
+						// TODO: Handle this case
 					} else if err != nil {
 						level.Error(b.logger).Log("err", err)
 					}
@@ -319,12 +321,39 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 					// Handle if member press the "Acknowledge" button
 					if cd.Button == strAcknowledgeData {
 						for _, h := range HandleAlerts[cd.AlertID] {
-							h.Acknowledge(b.telegram, callback)
+							level.Debug(b.logger).Log(
+								"msg", "run Acknowledge at",
+								"data", h.ID,
+							)
+							h.MessageID = callback.Message.ID
+							err := h.Acknowledge(b.telegram, callback)
+							if err != nil {
+								level.Error(b.logger).Log(
+									"msg", "failed to acknowledge",
+									"err", err,
+								)
+							}
 						}
 					} else if cd.Button == strForwardData {
-						// Handle if member press the "Acknowledge" button
+						// Handle if member press the "Forward" button
 						for _, h := range HandleAlerts[cd.AlertID] {
-							h.Forward(b.telegram, callback)
+							level.Debug(b.logger).Log(
+								"msg", "run Forward at",
+								"data", h.ID,
+							)
+							h.MessageID = callback.Message.ID
+							ackData, err := NewCallbackData(strAcknowledgeData, h.ID)
+							if err != nil {
+								break
+							}
+							jsonAckStr, err := json.Marshal(ackData)
+							err = h.Forward(b.telegram, callback, string(jsonAckStr))
+							if err != nil {
+								level.Error(b.logger).Log(
+									"msg", "failed to forward",
+									"err", err,
+								)
+							}
 						}
 
 					}
@@ -378,27 +407,35 @@ func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMes
 				continue
 			}
 
+			id := data.GroupLabels.Values()[0]
 			for _, chat := range chats {
 				// If receive the resolved signal via webhook, Resolve() all of HandlerAlert in the map list
 				if w.Status == string(model.AlertResolved) {
-					if HandleAlerts[data.GroupLabels.Values()[0]] != nil {
-						for _, h := range HandleAlerts[data.GroupLabels.Values()[0]] {
+					// TODO: If do not have any reaction from member, maybe having bug here because HandleAlert.MessageID is nil
+					if HandleAlerts[id] != nil {
+						for _, h := range HandleAlerts[id] {
 							h.Resolved(b.telegram)
 						}
 					}
 				} else if w.Status == string(model.AlertFiring) {
 					// If receive the firing signal via webhook, create the inline message with 2 buttons,
-					ackData, err := NewCallbackData(data.GroupLabels.Values()[0], strAcknowledgeData)
+					ackData, err := NewCallbackData(strAcknowledgeData, id)
 					if err != nil {
 						break
 					}
 					jsonAckStr, err := json.Marshal(ackData)
+					if err != nil {
+						break
+					}
 					level.Debug(b.logger).Log("json", jsonAckStr)
-					fwdData, err := NewCallbackData(data.GroupLabels.Values()[0], strForwardData)
+					fwdData, err := NewCallbackData(strForwardData, id)
 					if err != nil {
 						break
 					}
 					jsonFwdStr, err := json.Marshal(fwdData)
+					if err != nil {
+						break
+					}
 					level.Debug(b.logger).Log("json", jsonFwdStr)
 
 					b.telegram.SendMessage(chat, out, &telebot.SendOptions{
@@ -420,7 +457,7 @@ func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMes
 					})
 
 					// And create new HandleAlert object and put it to channel
-					alert, err := NewAlert(data.GroupLabels.Values()[0], chat, data.Alerts[0], *b)
+					alert, err := NewAlert(id, chat, data.Alerts[0], *b)
 					if err != nil {
 						level.Error(b.logger).Log("msg", "failed to create new handle alert", "err", err)
 						break
@@ -570,13 +607,13 @@ func (b *Bot) tmplAlerts(alerts ...*types.Alert) (string, error) {
 	return out, nil
 }
 
-func (b *Bot) handleMember(message telebot.Message) {
-	// Right format: '/member username level (node if level = 1)'.
-	// Ex: /member vu-long 1 httpd
+func (b *Bot) handleAddMember(message telebot.Message) {
+	// Right format: '/addmember username level (node if level = 1)'.
+	// Ex: /addmember vu_long 1 httpd
 	params := strings.Split(message.Text, " ")
 	if len(params) < 3 || len(params) > 4 {
 		level.Warn(b.logger).Log("msg", "need 2-3 parameters")
-		b.telegram.SendMessage(message.Chat, "Please send right format: '/member username level (node if level = 1)'. Ex: /member vu-long 1 httpd", nil)
+		b.telegram.SendMessage(message.Chat, "Please send right format: '/addmember username level (node if level = 1)'. Ex: /addmember vu_long 1 httpd", nil)
 		return
 	}
 
@@ -616,6 +653,34 @@ func (b *Bot) handleMember(message telebot.Message) {
 		"msg", "Member added",
 		"username", member.Username,
 		"level", member.Level,
+	)
+}
+
+func (b *Bot) handleRemoveMember(message telebot.Message) {
+	// Right format: '/rmmember username level (node if level = 1)'.
+	// Ex: /rmmember vu_long 1 httpd
+	params := strings.Split(message.Text, " ")
+	level.Debug(b.logger).Log("len", len(params))
+	if len(params) != 2 {
+		level.Warn(b.logger).Log("msg", "need only 1 parameter")
+		b.telegram.SendMessage(message.Chat, "Please send right format: '/rmmember username'. Ex: /rmmember vu_long", nil)
+		return
+	}
+
+	member := Member{
+		Username: params[1],
+	}
+
+	if err := b.members.Remove(member); err != nil {
+		level.Warn(b.logger).Log("msg", "failed to remove chat to chat store", "err", err)
+		b.telegram.SendMessage(message.Chat, "I can't remove this member to the subscribers list.", nil)
+		return
+	}
+
+	b.telegram.SendMessage(message.Chat, responseMember, nil)
+	level.Info(b.logger).Log(
+		"msg", "Member is removed",
+		"username", member.Username,
 	)
 }
 

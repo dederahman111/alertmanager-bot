@@ -95,7 +95,9 @@ func (s *MemberStore) GetRandomMemberByChatandLevel(chat telebot.Chat, level str
 			groupByLevel = append(groupByLevel, mr)
 		}
 	}
-	rand.Seed(time.Now().UnixNano())
-	choosen := groupByLevel[rand.Intn(len(groupByLevel))]
-	return choosen, nil
+	if len(groupByLevel) > 0 {
+		rand.Seed(time.Now().UnixNano())
+		ret = groupByLevel[rand.Intn(len(groupByLevel))]
+	}
+	return ret, nil
 }
