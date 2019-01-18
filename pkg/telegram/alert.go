@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/alertmanager/template"
@@ -11,6 +12,7 @@ import (
 // HandleAlert shows all of Alert in the
 type HandleAlert struct {
 	ID              string
+	MessageID       int
 	MemberStore     BotMemberStore
 	NodeStore       BotNodeStore
 	Chat            telebot.Chat
@@ -22,16 +24,16 @@ type HandleAlert struct {
 
 // Destination is internal inline message ID.
 func (a HandleAlert) Destination() string {
-	return a.ID
+	return strconv.Itoa(a.MessageID)
 }
 
 // HandleLevel shows the level of member is handling the firing alert
 type HandleLevel string
 
 const (
-	levelOne   HandleLevel = "level1"
-	levelTwo   HandleLevel = "level2"
-	levelThree HandleLevel = "level3"
+	levelOne   HandleLevel = "1"
+	levelTwo   HandleLevel = "2"
+	levelThree HandleLevel = "3"
 
 	// AutoForwardTimeout If no one action that message in 5 minutes, then do auto forward
 	AutoForwardTimeout time.Duration = 5 * time.Minute
@@ -59,9 +61,10 @@ type BotAlertStore interface {
  */
 
 // NewAlert creates the Handle Alert object
-func NewAlert(messageID string, chat telebot.Chat, alert template.Alert, bot Bot) (*HandleAlert, error) {
+func NewAlert(ID string, chat telebot.Chat, alert template.Alert, bot Bot) (*HandleAlert, error) {
 	a := &HandleAlert{
-		ID:              messageID,
+		ID:              ID,
+		MessageID:       0,
 		MemberStore:     bot.members,
 		NodeStore:       bot.nodes,
 		Chat:            chat,
@@ -71,29 +74,23 @@ func NewAlert(messageID string, chat telebot.Chat, alert template.Alert, bot Bot
 		AutoForwardFlag: true,
 	}
 
-	// TODO: Response level 1 alert: @owner instead of random
-	{
-		members, err := a.MemberStore.GetMembersByChat(a.Chat)
-		if err != nil {
-			return nil, err
-		}
-		randMember, err := members.GetRandomMemberByLevel(string(a.Level))
-		if err != nil {
-			return nil, err
-		}
-
-		respString := fmt.Sprintf("@%s", randMember)
-		bot.telegram.SendMessage(a.Chat, respString, nil)
+	// Response level 1 alert: @owner instead of random
+	randMember, err := a.MemberStore.GetRandomMemberByChatandLevel(a.Chat, string(a.Level))
+	if err != nil {
+		return nil, err
 	}
 
-	go a.AutoForward(*bot.telegram, 5*time.Second)
+	respString := fmt.Sprintf("@%s", randMember.Username)
+	bot.telegram.SendMessage(a.Chat, respString, nil)
+
+	go a.AutoForward(bot.telegram, 5*time.Second)
 
 	return a, nil
 }
 
 // Acknowledge is function to process callback whenever member press the Acknowledge button
-func (a *HandleAlert) Acknowledge(bot telebot.Bot, callback telebot.Callback) error {
-	err := bot.EditMessageReplyMakeup(a, &telebot.SendOptions{
+func (a *HandleAlert) Acknowledge(bot *telebot.Bot, callback telebot.Callback) error {
+	err := bot.EditMessageReplyMakeup(a.Chat, a.MessageID, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 	})
 	if err != nil {
@@ -108,15 +105,15 @@ func (a *HandleAlert) Acknowledge(bot telebot.Bot, callback telebot.Callback) er
 }
 
 // Forward is function to process callback whenever member press the Forward button
-func (a *HandleAlert) Forward(bot telebot.Bot, callback telebot.Callback) error {
-	err := bot.EditMessageReplyMakeup(a, &telebot.SendOptions{
+func (a *HandleAlert) Forward(bot *telebot.Bot, callback telebot.Callback, data string) error {
+	err := bot.EditMessageReplyMakeup(a.Chat, a.MessageID, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 		ReplyMarkup: telebot.ReplyMarkup{
 			InlineKeyboard: [][]telebot.KeyboardButton{
 				[]telebot.KeyboardButton{
 					telebot.KeyboardButton{
-						Text: "Acknowledge",
-						Data: "Acknowledge", // Callback query
+						Text: strAcknowledgeData,
+						Data: data, // Callback query
 					},
 				},
 			},
@@ -127,35 +124,28 @@ func (a *HandleAlert) Forward(bot telebot.Bot, callback telebot.Callback) error 
 	}
 
 	a.IncreaseLevel()
-	members, err := a.MemberStore.GetMembersByChat(a.Chat)
-	if err != nil {
-		return err
-	}
-	randMember, err := members.GetRandomMemberByLevel(string(a.Level))
+	randMember, err := a.MemberStore.GetRandomMemberByChatandLevel(a.Chat, string(a.Level))
 	if err != nil {
 		return err
 	}
 
-	respString := fmt.Sprintf(strForward, callback.Sender.Username, randMember)
+	respString := fmt.Sprintf(strForward, callback.Sender.Username, randMember.Username)
 	bot.SendMessage(a.Chat, respString, nil)
 	return nil
 }
 
 // AutoForward job run to auto forward and push the alert to telegram alert group
-func (a *HandleAlert) AutoForward(bot telebot.Bot, timeout time.Duration) error {
+func (a *HandleAlert) AutoForward(bot *telebot.Bot, timeout time.Duration) error {
 	for a.AutoForwardFlag == true {
 		if time.Since(a.LastUpdate) >= AutoForwardTimeout {
+			a.LastUpdate = time.Now()
 			a.IncreaseLevel()
-			members, err := a.MemberStore.GetMembersByChat(a.Chat)
-			if err != nil {
-				return err
-			}
-			randMember, err := members.GetRandomMemberByLevel(string(a.Level))
+			randMember, err := a.MemberStore.GetRandomMemberByChatandLevel(a.Chat, string(a.Level))
 			if err != nil {
 				return err
 			}
 
-			respString := fmt.Sprintf(strAutoForward, randMember)
+			respString := fmt.Sprintf(strAutoForward, randMember.Username)
 			bot.SendMessage(a.Chat, respString, nil)
 		}
 		// Wait for a bit and try again.
@@ -166,8 +156,8 @@ func (a *HandleAlert) AutoForward(bot telebot.Bot, timeout time.Duration) error 
 }
 
 // Resolved handle resolve signal from callback
-func (a *HandleAlert) Resolved(bot telebot.Bot) error {
-	err := bot.EditMessageReplyMakeup(a, &telebot.SendOptions{
+func (a *HandleAlert) Resolved(bot *telebot.Bot) error {
+	err := bot.EditMessageReplyMakeup(a.Chat, a.MessageID, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 	})
 	if err != nil {
