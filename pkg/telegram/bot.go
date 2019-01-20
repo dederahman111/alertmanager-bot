@@ -325,7 +325,7 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 								"msg", "run Acknowledge at",
 								"data", h.ID,
 							)
-							h.MessageID = callback.Message.ID
+							// h.MessageID = callback.Message.ID
 							err := h.Acknowledge(b.telegram, callback)
 							if err != nil {
 								level.Error(b.logger).Log(
@@ -341,7 +341,7 @@ func (b *Bot) Run(ctx context.Context, webhooks <-chan notify.WebhookMessage) er
 								"msg", "run Forward at",
 								"data", h.ID,
 							)
-							h.MessageID = callback.Message.ID
+							// h.MessageID = callback.Message.ID
 							ackData, err := NewCallbackData(strAcknowledgeData, h.ID)
 							if err != nil {
 								break
@@ -411,53 +411,17 @@ func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMes
 			for _, chat := range chats {
 				// If receive the resolved signal via webhook, Resolve() all of HandlerAlert in the map list
 				if w.Status == string(model.AlertResolved) {
-					// TODO: If do not have any reaction from member, maybe having bug here because HandleAlert.MessageID is nil
-					if HandleAlerts[id] != nil {
+					// Handler resolved signal via webhook
+					if len(HandleAlerts[id]) > 0 {
 						for _, h := range HandleAlerts[id] {
-							h.Resolved(b.telegram)
+							h.Resolved(b.telegram, out)
 						}
 					}
 				} else if w.Status == string(model.AlertFiring) {
 					// If receive the firing signal via webhook, create the inline message with 2 buttons,
-					ackData, err := NewCallbackData(strAcknowledgeData, id)
-					if err != nil {
-						break
-					}
-					jsonAckStr, err := json.Marshal(ackData)
-					if err != nil {
-						break
-					}
-					level.Debug(b.logger).Log("json", jsonAckStr)
-					fwdData, err := NewCallbackData(strForwardData, id)
-					if err != nil {
-						break
-					}
-					jsonFwdStr, err := json.Marshal(fwdData)
-					if err != nil {
-						break
-					}
-					level.Debug(b.logger).Log("json", jsonFwdStr)
-
-					b.telegram.SendMessage(chat, out, &telebot.SendOptions{
-						ParseMode: telebot.ModeHTML,
-						ReplyMarkup: telebot.ReplyMarkup{
-							InlineKeyboard: [][]telebot.KeyboardButton{
-								[]telebot.KeyboardButton{
-									telebot.KeyboardButton{
-										Text: strAcknowledgeData,
-										Data: string(jsonAckStr), // Callback query
-									},
-									telebot.KeyboardButton{
-										Text: strForwardData,
-										Data: string(jsonFwdStr), // Callback query
-									},
-								},
-							},
-						},
-					})
 
 					// And create new HandleAlert object and put it to channel
-					alert, err := NewAlert(id, chat, data.Alerts[0], *b)
+					alert, err := NewAlert(id, chat, data.Alerts[0], b, out)
 					if err != nil {
 						level.Error(b.logger).Log("msg", "failed to create new handle alert", "err", err)
 						break
@@ -482,7 +446,7 @@ func (b *Bot) handleStart(message telebot.Message) {
 
 	b.telegram.SendMessage(message.Chat, fmt.Sprintf(responseStart, message.Sender.FirstName), nil)
 	level.Info(b.logger).Log(
-		"user subscribed",
+		"msg", "user subscribed",
 		"username", message.Sender.Username,
 		"user_id", message.Sender.ID,
 	)
@@ -497,7 +461,7 @@ func (b *Bot) handleStop(message telebot.Message) {
 
 	b.telegram.SendMessage(message.Chat, fmt.Sprintf(responseStop, message.Sender.FirstName), nil)
 	level.Info(b.logger).Log(
-		"user unsubscribed",
+		"msg", "user unsubscribed",
 		"username", message.Sender.Username,
 		"user_id", message.Sender.ID,
 	)
@@ -568,7 +532,7 @@ func (b *Bot) handleAlerts(message telebot.Message) {
 		return
 	}
 
-	err = b.telegram.SendMessage(message.Chat, out, &telebot.SendOptions{
+	_, err = b.telegram.SendMessage(message.Chat, out, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 	})
 	if err != nil {
