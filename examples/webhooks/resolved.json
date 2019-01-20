@@ -5,7 +5,7 @@
        {
           "status":"resolved",
           "labels":{
-             "alertname":"Fire",
+             "alertname":"httpd",
              "severity":"critical"
           },
           "annotations":{
@@ -17,10 +17,10 @@
        }
     ],
     "groupLabels":{
-       "alertname":"Fire"
+       "alertname":"httpd"
     },
     "commonLabels":{
-       "alertname":"Fire",
+       "alertname":"httpd",
        "severity":"critical"
     },
     "commonAnnotations":{
@@ -28,5 +28,5 @@
     },
     "externalURL":"http://localhost:9093",
     "version":"4",
-    "groupKey":"{}:{alertname=\"Fire\"}"
+    "groupKey":"{}:{alertname=\"httpd\"}"
  }

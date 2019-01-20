@@ -9,7 +9,7 @@ curl \
       {                     \
          "status":"firing", \
          "labels":{         \
-            "alertname":"HTTPD Down",                               \
+            "alertname":"httpd",                                    \
             "severity":"critical"                                   \
          },                                                         \
          "annotations":{                                            \
@@ -21,10 +21,10 @@ curl \
       }                                                             \
    ],                                                   \
    "groupLabels":{                                      \
-      "alertname":"HTTPD Down"                          \
+      "alertname":"httpd"                               \
    },                                                   \
    "commonLabels":{                                     \
-      "alertname":"HTTPD Down",                         \
+      "alertname":"httpd",                              \
       "severity":"critical"                             \
    },                                                   \
    "commonAnnotations":{                                \
@@ -32,6 +32,6 @@ curl \
    },                                                   \
    "externalURL":"http://localhost:9093",               \
    "version":"4",                                       \
-   "groupKey":"{}:{alertname=\"HTTPD Down\"}"           \
+   "groupKey":"{}:{alertname=\"httpd\"}"                \
 }' \
 localhost:8080
