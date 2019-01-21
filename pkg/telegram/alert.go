@@ -53,7 +53,7 @@ type BotAlertStore interface {
 }
 
 /* TODO:
- * 		- Command /addserver name owner_id (ex: /addserver nginx 789593887) to monitor
+ * 		v - Command /addserver name owner_id (ex: /addserver nginx 789593887) to monitor
  *		- Response level 1 alert: @owner
  * 		v Response callback FIRING:
  *		v	+ Ack: Hide all inline buttons, show username of this member, stop auto forward
@@ -117,12 +117,25 @@ func NewAlert(id string, chat telebot.Chat, alert template.Alert, b *Bot, out st
 	}
 
 	// TODO: Response level 1 alert: @owner instead of random
-	randMember, err := a.MemberStore.GetRandomMemberByChatandLevel(a.Chat, string(a.Level))
+	nodes, err := a.NodeStore.List()
 	if err != nil {
 		return nil, err
 	}
+	memberID := ""
+	for _, n := range nodes {
+		if n.Name == a.ID {
+			memberID = n.Owner
+		}
+	}
+	if memberID == "" {
+		randMember, err := a.MemberStore.GetRandomMemberByChatandLevel(a.Chat, string(a.Level))
+		if err != nil {
+			return nil, err
+		}
+		memberID = randMember.Username
+	}
 
-	respString := fmt.Sprintf("@%s", randMember.Username)
+	respString := fmt.Sprintf("@%s", memberID)
 	b.telegram.SendMessage(a.Chat, respString, nil)
 
 	go a.AutoForward(b.telegram, 5*time.Second)
