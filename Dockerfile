@@ -12,6 +12,7 @@ WORKDIR /go/src/github.com/vu-long/alertmanager-bot
 
 # Go dep!
 RUN go get -u github.com/golang/dep/...
+RUN dep init -v
 RUN dep ensure -v -vendor-only
 
 RUN make build
