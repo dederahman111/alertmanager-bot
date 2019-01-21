@@ -54,7 +54,7 @@ type BotAlertStore interface {
 
 /* TODO:
  * 		v - Command /addserver name owner_id (ex: /addserver nginx 789593887) to monitor
- *		- Response level 1 alert: @owner
+ *		v - Response level 1 alert: @owner
  * 		v Response callback FIRING:
  *		v	+ Ack: Hide all inline buttons, show username of this member, stop auto forward
  *		v	+ Forward: Show username that did forward the alert and username of Level 2 of recipients, button ‘Forward’ will be hide
@@ -116,7 +116,6 @@ func NewAlert(id string, chat telebot.Chat, alert template.Alert, b *Bot, out st
 		AutoForwardFlag: true,
 	}
 
-	// TODO: Response level 1 alert: @owner instead of random
 	nodes, err := a.NodeStore.List()
 	if err != nil {
 		return nil, err
@@ -134,34 +133,51 @@ func NewAlert(id string, chat telebot.Chat, alert template.Alert, b *Bot, out st
 		}
 		memberID = randMember.Username
 	}
+	go a.AutoForward(b.telegram, 5*time.Second)
 
 	respString := fmt.Sprintf("@%s", memberID)
-	b.telegram.SendMessage(a.Chat, respString, nil)
-
-	go a.AutoForward(b.telegram, 5*time.Second)
+	_, err = b.telegram.SendMessage(a.Chat, respString, nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return a, nil
 }
 
 // Acknowledge is function to process callback whenever member press the Acknowledge button
 func (a *HandleAlert) Acknowledge(bot *telebot.Bot, callback telebot.Callback) error {
-	err := bot.EditMessageReplyMakeup(a.Chat, a.MessageID, &telebot.SendOptions{
+	a.AutoForwardFlag = false
+
+	respString := fmt.Sprintf(strAcknowledge, callback.Sender.Username)
+	_, err := bot.SendMessage(a.Chat, respString, nil)
+	if err != nil {
+		return err
+	}
+	err = bot.EditMessageReplyMakeup(a.Chat, a.MessageID, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 	})
 	if err != nil {
 		return err
 	}
 
-	a.AutoForwardFlag = false
-
-	respString := fmt.Sprintf(strAcknowledge, callback.Sender.Username)
-	bot.SendMessage(a.Chat, respString, nil)
 	return nil
 }
 
 // Forward is function to process callback whenever member press the Forward button
 func (a *HandleAlert) Forward(bot *telebot.Bot, callback telebot.Callback, data string) error {
-	err := bot.EditMessageReplyMakeup(a.Chat, a.MessageID, &telebot.SendOptions{
+	a.IncreaseLevel()
+	randMember, err := a.MemberStore.GetRandomMemberByChatandLevel(a.Chat, string(a.Level))
+	if err != nil {
+		return err
+	}
+
+	respString := fmt.Sprintf(strForward, callback.Sender.Username, randMember.Username)
+	_, err = bot.SendMessage(a.Chat, respString, nil)
+	if err != nil {
+		return err
+	}
+
+	err = bot.EditMessageReplyMakeup(a.Chat, a.MessageID, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 		ReplyMarkup: telebot.ReplyMarkup{
 			InlineKeyboard: [][]telebot.KeyboardButton{
@@ -177,15 +193,6 @@ func (a *HandleAlert) Forward(bot *telebot.Bot, callback telebot.Callback, data 
 	if err != nil {
 		return err
 	}
-
-	a.IncreaseLevel()
-	randMember, err := a.MemberStore.GetRandomMemberByChatandLevel(a.Chat, string(a.Level))
-	if err != nil {
-		return err
-	}
-
-	respString := fmt.Sprintf(strForward, callback.Sender.Username, randMember.Username)
-	bot.SendMessage(a.Chat, respString, nil)
 	return nil
 }
 
@@ -212,15 +219,15 @@ func (a *HandleAlert) AutoForward(bot *telebot.Bot, timeout time.Duration) error
 
 // Resolved handle resolve signal from callback
 func (a *HandleAlert) Resolved(bot *telebot.Bot, out string) error {
-	err := bot.EditMessageReplyMakeup(a.Chat, a.MessageID, &telebot.SendOptions{
+	a.AutoForwardFlag = false
+	_, err := bot.SendMessage(a.Chat, out, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 	})
 	if err != nil {
 		return err
 	}
 
-	a.AutoForwardFlag = false
-	_, err = bot.SendMessage(a.Chat, out, &telebot.SendOptions{
+	err = bot.EditMessageReplyMakeup(a.Chat, a.MessageID, &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 	})
 	if err != nil {

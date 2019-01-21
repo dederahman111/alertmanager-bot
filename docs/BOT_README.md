@@ -1,4 +1,30 @@
-# Bot for Prometheus' Alertmanager
+# Bot for Prometheus' Alertmanager [![Build Status](https://cloud.drone.io/api/badges/metalmatze/alertmanager-bot/status.svg)](https://cloud.drone.io/metalmatze/alertmanager-bot)
+
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/metalmatze/alertmanager-bot.svg?maxAge=604800)](https://hub.docker.com/r/metalmatze/alertmanager-bot)
+[![Go Report Card](https://goreportcard.com/badge/github.com/metalmatze/alertmanager-bot)](https://goreportcard.com/report/github.com/metalmatze/alertmanager-bot)
+
+
+This is the [Alertmanager](https://prometheus.io/docs/alerting/alertmanager/) bot for 
+[Prometheus](https://prometheus.io/) that notifies you on alerts.  
+Just configure the Alertmanager to send Webhooks to the bot and that's it.
+
+Additionally you can always **send commands** to get up-to-date information from the alertmanager.
+
+### Why?
+
+Alertmanager already integrates a lot of different messengers as receivers for alerts.  
+I want to extend this basic functionality.
+
+Previously the Alertmanager could only talk to you via a chat, but now you can talk back via [commands](#commands).  
+You can ask about current ongoing [alerts](#alerts) and [silences](#silences).  
+In the future I plan to also support silencing via the chat, so you can silences after getting an alert from within the chat.  
+A lot of other things can be added!
+
+## Messengers
+
+Right now it supports [Telegram](https://telegram.org/), but I'd like to [add more](#more-messengers) in the future.
+
 ## Commands
 
 ###### /start
@@ -62,54 +88,67 @@
 > [/alerts](#alerts) - List all alerts.  
 > [/silences](#silences) - List all silences.  
 > [/chats](#chats) - List all users and group chats that subscribed.
-> [/members](#members) - List all members.
-> [/addmember](#addmember) - Add a member.
-> [/rmmember](#rmmember) - Remove a member.
-> [/nodes](#nodes) - List all nodes.
-
-###### /members
-Currently these members have added:
-@vulong2 level: 1
-@boss level: 3
-@cto level: 3
-@leader1 level: 2
-@leader2 level: 2
-@vu_long level: 1
-@vulong3 level: 2
-@vulong4 level: 3
-
-###### /addmember
-Right format: '/addmember username level (node if level = 1)'. Ex: /addmember vu_long 1 httpd
-> Already do your wish!
-
-###### /rmmember
-Right format: '/rmmember username'. Ex: /rmmember vu_long
-> Already do your wish!
-
-###### /nodes
-> Currently these nodes have added:
-> @httpd level: vu_long5
-> @nginx level: vulong2
 
 ## Installation
 
-#### Consul Storage
+### Docker
+
+`docker pull metalmatze/alertmanager-bot:0.3.1`
+
+Start as a command:
+
+#### Bolt Storage
+
 ```bash
-consul agent -dev
+docker run -d \
+	-e 'ALERTMANAGER_URL=http://alertmanager:9093' \
+	-e 'BOLT_PATH=/data/bot.db' \
+	-e 'STORE=bolt' \
+	-e 'TELEGRAM_ADMIN=1234567' \
+	-e 'TELEGRAM_TOKEN=XXX' \
+	-v '/srv/monitoring/alertmanager-bot:/data'
+	--name alertmanager-bot \
+	alertmanager-bot:0.3.1
+```
+
+#### Consul Storage
+
+```bash
+docker run -d \
+	-e 'ALERTMANAGER_URL=http://alertmanager:9093' \
+	-e 'CONSUL_URL=localhost:8500' \
+	-e 'STORE=consul' \
+	-e 'TELEGRAM_ADMIN=1234567' \
+	-e 'TELEGRAM_TOKEN=XXX' \
+	--name alertmanager-bot \
+	alertmanager-bot:0.3.1
 ```
 
 Usage within docker-compose:
 
-```bash
-docker-compose build
-docker-compose up
+```yml
+alertmanager-bot:
+  image: metalmatze/alertmanager-bot:0.3.1
+  environment:
+    ALERTMANAGER_URL: http://alertmanager:9093
+    BOLT_PATH: /data/bot.db
+    STORE: bolt
+    TELEGRAM_ADMIN: '1234567'
+    TELEGRAM_TOKEN: XXX
+    TEMPLATE_PATHS: /templates/default.tmpl
+  volumes:
+  - /srv/monitoring/alertmanager-bot:/data
 ```
+### Build from source
+
+`go get github.com/metalmatze/alertmanager-bot`
 
 ### Configuration
 
 ENV Variable | Description
 |-------------------|------------------------------------------------------|
 | ALERTMANAGER_URL  | Address of the alertmanager, default: `http://localhost:9093` |
+| BOLT_PATH         | Path on disk to the file where the boltdb is stored, default: `/tmp/bot.db` |
 | CONSUL_URL        | The URL to use to connect with Consul, default: `localhost:8500` |
 | LISTEN_ADDR       | Address that the bot listens for webhooks, default: `0.0.0.0:8080` |
 | STORE             | The type of the store to use, choose from bolt (local) or consul (distributed) |
@@ -124,26 +163,39 @@ of the `--telegram.admin` command line option or by specifying a
 newline-separated list of telegram user IDs in the `TELEGRAM_ADMIN` environment
 variable.
 
+#### Alertmanager Configuration 
+
+Now you need to connect the Alertmanager to send alerts to the bot.  
+A webhook is used for that, so make sure your `LISTEN_ADDR` is reachable for the Alertmanager.
+
+For example add this to your `alertmanager.yml` configuration:
+```yaml
+receivers:
+- name: 'alertmananger-bot'
+  webhook_configs:
+  - send_resolved: true
+    url: 'http://alertmanager-bot:8080'
+```
+
 ## Development
 
 Get all dependencies. We use [golang/dep](https://github.com/golang/dep).  
 Fetch all dependencies with:
 
 ```
-dep init
 dep ensure -v -vendor-only
 ```
 
 Build the binary using `make`:
 
 ```
-make build
+make install
 ```
 
 In case you have `$GOPATH/bin` in your `$PATH` you can now simply start the bot by running:
 
 ```bash
-./alertmanager-bot
+alertmanager-bot
 ```
 
 ## Missing
@@ -153,3 +205,15 @@ In case you have `$GOPATH/bin` in your `$PATH` you can now simply start the bot 
 * `/silence` - show a specific silence  
 * `/silence_del` - delete a silence by command  
 * `/silence_add` - add a silence for a alert by command
+
+##### More Messengers
+
+At the moment I only implemented Telegram, because it's so freakin' easy to do.
+
+Messengers considered to add in the future:
+
+* [Slack](https://slack.com/)
+* [Mattermost](https://about.mattermost.com/)
+* [Matrix](https://matrix.org/)
+
+If one is missing for you just open an issue.

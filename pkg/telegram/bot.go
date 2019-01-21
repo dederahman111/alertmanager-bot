@@ -57,6 +57,10 @@ Available commands:
 ` + commandAlerts + ` - List all alerts.
 ` + commandSilences + ` - List all silences.
 ` + commandChats + ` - List all users and group chats that subscribed.
+` + commandMembers + ` - List all members.
+` + commandAddMember + ` - Add a member.
+` + commandRemoveMember + ` - Remove a member.
+` + commandNodes + ` - List all nodes.
 `
 )
 
