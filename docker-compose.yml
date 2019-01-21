@@ -9,38 +9,48 @@ volumes:
     grafana_data: {}
 
 services:
-  # alertmanager-bot:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: alertmanager-bot
-  #   # image: alertmanager-bot:latest
-  #   environment:
-  #     ALERTMANAGER_URL: http://alertmanager:9093
-  #     BOLT_PATH: /data/bot.db
-  #     CONSUL_URL: consul-agent:8500
-  #     LISTEN_ADDR: 0.0.0.0:8080
-  #     STORE: consul
-  #     TELEGRAM_ADMIN: 789593887
-  #     TELEGRAM_TOKEN: 715767920:AAHM_dFYTF8Q4FG3gnQjvljKCJx4n1dCWuI
-  #     TEMPLATE_PATHS: /templates/default.tmpl
-  #   ports:
-  #     - 8080:8080
-  #   restart: unless-stopped
-  #   networks:
-  #     - monitor-net
-  #   # volumes:
-  #   # - /srv/monitoring/alertmanager-bot:/data
+  alertmanager-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alertmanager-bot
+    # image: alertmanager-bot:latest
+    environment:
+      ALERTMANAGER_URL: http://alertmanager:9093
+      BOLT_PATH: /data/bot.db
+      CONSUL_URL: consul-agent:8500
+      LISTEN_ADDR: 0.0.0.0:8080
+      STORE: consul
+      TELEGRAM_ADMIN: 789593887
+      TELEGRAM_TOKEN: 715767920:AAHM_dFYTF8Q4FG3gnQjvljKCJx4n1dCWuI
+      TEMPLATE_PATHS: /templates/default.tmpl
+      LOG_LEVEL: debug
+    ports:
+      - 8080:8080
+    restart: unless-stopped
+    depends_on:
+      - consul-agent
+      - prometheus
+      - alertmanager
+      - blackbox-exporter
+      # - grafana
+    networks:
+      - monitor-net
+    # volumes:
+    # - .:/go/src/github.com/vu-long/alertmanager-bot
 
-  # consul-agent:
-  #   image: consul:latest
-  #   container_name: consul-agent
-  #   restart: unless-stopped
-  #   networks:
-  #     - monitor-net
-  #   command: "agent -dev"
-  #   ports:
-  #     - 8500:8500
+  consul-agent:
+    image: consul:latest
+    container_name: consul-agent
+    environment:
+      - "CONSUL_LOCAL_CONFIG={\"disable_update_check\": true}"
+    restart: unless-stopped
+    hostname: consul-agent
+    networks:
+      - monitor-net
+    command: "agent -server -bootstrap -ui -client=0.0.0.0"
+    ports:
+      - 8500
 
   prometheus:
     image: prom/prometheus:latest
@@ -106,26 +116,26 @@ services:
    networks:
      - monitor-net
 
-  grafana:
-   image: grafana/grafana:latest
-   container_name: grafana
-   volumes:
-     - grafana_data:/var/lib/grafana
-     - ./services/grafana/datasources:/etc/grafana/datasources
-     - ./services/grafana/dashboards:/etc/grafana/dashboards
-     - ./services/grafana/setup.sh:/setup.sh
-   entrypoint: /setup.sh
-   environment:
-     - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
-     - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
-     - GF_USERS_ALLOW_SIGN_UP=false
-   restart: unless-stopped
-   expose:
-     - 3000
-   ports:
-     - 3000:3000
-   networks:
-     - monitor-net
+  # grafana:
+  #  image: grafana/grafana:latest
+  #  container_name: grafana
+  #  volumes:
+  #    - grafana_data:/var/lib/grafana
+  #    - ./services/grafana/datasources:/etc/grafana/datasources
+  #    - ./services/grafana/dashboards:/etc/grafana/dashboards
+  #    - ./services/grafana/setup.sh:/setup.sh
+  #  entrypoint: /setup.sh
+  #  environment:
+  #    - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
+  #    - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+  #    - GF_USERS_ALLOW_SIGN_UP=false
+  #  restart: unless-stopped
+  #  expose:
+  #    - 3000
+  #  ports:
+  #    - 3000:3000
+  #  networks:
+  #    - monitor-net
   
   httpd:
     image: httpd

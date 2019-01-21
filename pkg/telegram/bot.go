@@ -411,7 +411,13 @@ func (b *Bot) sendWebhook(ctx context.Context, webhooks <-chan notify.WebhookMes
 				continue
 			}
 
-			id := data.GroupLabels.Values()[0]
+			id := data.Alerts[0].Labels["alertname"]
+			if id == "" {
+				level.Warn(b.logger).Log("msg", "missing alertname")
+				continue
+			}
+
+			// id += string(time.Stamp)
 			for _, chat := range chats {
 				// If receive the resolved signal via webhook, Resolve() all of HandlerAlert in the map list
 				if w.Status == string(model.AlertResolved) {

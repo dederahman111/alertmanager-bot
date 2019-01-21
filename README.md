@@ -80,7 +80,16 @@ Currently these members have added:
 
 ###### /addmember
 Right format: '/addmember username level (node if level = 1)'. Ex: /addmember vu_long 1 httpd
+> /addmember vu_long 1 httpd
+> /addmember vu_long2 1 nginx
+> /addmember techmanager 2
+> /addmember techleader 2
+> /addmember SRE 3
+> /addmember CTO 3
+> /addmember CEO 3
 > Already do your wish!
+
+
 
 ###### /rmmember
 Right format: '/rmmember username'. Ex: /rmmember vu_long
