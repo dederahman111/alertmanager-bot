@@ -3,7 +3,8 @@
 {{ if eq .Status "firing"}}🔥 <b>{{ .Status | toUpper }}</b> 🔥{{ else }}<b>{{ .Status | toUpper }}</b>{{ end }}
 <b>{{ .Labels.alertname }}</b>
 {{ .Annotations.message }}
-<b>Duration:</b> {{ duration .StartsAt .EndsAt }}{{ if ne .Status "firing"}}
+{{ if eq .Status "firing"}}<b>Started:</b> {{ .StartsAt | since }}{{ end }}
+{{ if ne .Status "firing"}}<b>Duration:</b> {{ duration .StartsAt .EndsAt }}
 <b>Ended:</b> {{ .EndsAt | since }}{{ end }}
 {{ end }}
 {{ end }}
