@@ -54,7 +54,7 @@ type BotAlertStore interface {
 
 /* TODO:
  * 		v - Command /addserver name owner_id (ex: /addserver nginx 789593887) to monitor
- *		- Response level 1 alert: @owner
+ *		v - Response level 1 alert: @owner
  * 		v Response callback FIRING:
  *		v	+ Ack: Hide all inline buttons, show username of this member, stop auto forward
  *		v	+ Forward: Show username that did forward the alert and username of Level 2 of recipients, button ‘Forward’ will be hide
