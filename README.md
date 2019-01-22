@@ -1,4 +1,16 @@
 # Bot for Prometheus' Alertmanager
+
+## Installation
+
+Edit TELEGRAM_ADMIN in docker-compose.yml file to the bot admin telegramID.
+
+Usage within docker-compose
+
+```bash
+docker-compose build
+docker-compose up -d
+```
+
 ## Commands
 
 ###### /start
@@ -40,7 +52,6 @@
 > Currently these chat have subscribed:
 > @MetalMatze
 
-
 ###### /status
 
 > **AlertManager**  
@@ -68,15 +79,15 @@
 > [/nodes](#nodes) - List all nodes.
 
 ###### /members
-Currently these members have added:
-@vulong2 level: 1
-@boss level: 3
-@cto level: 3
-@leader1 level: 2
-@leader2 level: 2
-@vu_long level: 1
-@vulong3 level: 2
-@vulong4 level: 3
+> Currently these members have added:
+> @vulong2 level: 1
+> @boss level: 3
+> @cto level: 3
+> @leader1 level: 2
+> @leader2 level: 2
+> @vu_long level: 1
+> @vulong3 level: 2
+> @vulong4 level: 3
 
 ###### /addmember
 Right format: '/addmember username level (node if level = 1)'. Ex: /addmember vu_long 1 httpd
@@ -89,8 +100,6 @@ Right format: '/addmember username level (node if level = 1)'. Ex: /addmember vu
 > /addmember CEO 3
 > Already do your wish!
 
-
-
 ###### /rmmember
 Right format: '/rmmember username'. Ex: /rmmember vu_long
 > Already do your wish!
@@ -99,20 +108,6 @@ Right format: '/rmmember username'. Ex: /rmmember vu_long
 > Currently these nodes have added:
 > @httpd level: vu_long5
 > @nginx level: vulong2
-
-## Installation
-
-#### Consul Storage
-```bash
-consul agent -dev
-```
-
-Usage within docker-compose:
-
-```bash
-docker-compose build
-docker-compose up
-```
 
 ### Configuration
 
@@ -125,13 +120,6 @@ ENV Variable | Description
 | TELEGRAM_ADMIN    | The Telegram user id for the admin. The bot will only reply to messages sent from an admin. All other messages are dropped and logged on the bot's console. |
 | TELEGRAM_TOKEN    | Token you get from [@botfather](https://telegram.me/botfather) |
 | TEMPLATE_PATHS    | Path to custom message templates, default template is `./default.tmpl`, in docker - `/templates/default.tmpl` |
-
-#### Authentication
-
-Additional users may be allowed to command the bot by giving multiple instances
-of the `--telegram.admin` command line option or by specifying a
-newline-separated list of telegram user IDs in the `TELEGRAM_ADMIN` environment
-variable.
 
 ## Development
 
